@@ -87,7 +87,8 @@ async def broadcast(message: dict):
 
 async def poll_loop():
     print("[POLLER] 시작 - 1일치 초기 로딩")
-    since_1d = datetime(2026, 3, 11, tzinfo=timezone.utc)
+    # 2026-03-11 00:00 KST = 2026-03-10 15:00 UTC
+    since_1d = datetime(2026, 3, 10, 15, 0, tzinfo=timezone.utc)
 
     for keyword in KEYWORDS:
         articles = await fetch_news(keyword, since=since_1d)

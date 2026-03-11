@@ -569,8 +569,12 @@
     renderFeed();
   }
 
+  // 2026-03-11 00:00 KST 이전 기사 제외
+  const DATE_CUTOFF = new Date('2026-03-11T00:00:00+09:00');
+
   function renderFeed() {
-    const filtered = activeFilter === 'all' ? articles : articles.filter(a => a.keyword === activeFilter);
+    const base = articles.filter(a => new Date(a.published) >= DATE_CUTOFF);
+    const filtered = activeFilter === 'all' ? base : base.filter(a => a.keyword === activeFilter);
     const feed = document.getElementById('feed');
     const empty = document.getElementById('empty');
 
