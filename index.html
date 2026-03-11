@@ -90,6 +90,45 @@
 
     .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 
+    .date-range {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 10px;
+    }
+
+    .date-range label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+    .date-range input[type="date"] {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+      color-scheme: dark;
+    }
+
+    .date-range .sep { color: var(--text-dim); font-size: 12px; }
+
+    .search-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 6px;
+      padding: 5px 12px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    .search-btn:hover { background: #6355e8; }
+    .search-btn:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; }
+
     .stat-pill {
       font-size: 12px;
       color: var(--text-muted);
@@ -397,7 +436,14 @@
     <span id="conn-text">연결 중</span>
   </div>
   <div class="header-right">
-    <div class="stat-pill">새 기사 <span id="total">0</span>개</div>
+    <div class="date-range">
+      <label>기간</label>
+      <input type="date" id="date-from" />
+      <span class="sep">~</span>
+      <input type="date" id="date-to" />
+    </div>
+    <button class="search-btn" id="search-btn" onclick="searchByDate()">검색</button>
+    <div class="stat-pill">기사 <span id="total">0</span>개</div>
     <div class="stat-pill">마지막 체크 <span id="last-check">—</span></div>
   </div>
 </header>
@@ -620,6 +666,46 @@
   document.getElementById('kw-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') addKeyword();
   });
+
+  // 날짜 기본값: 오늘
+  function todayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+  function yesterdayStr() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  document.getElementById('date-from').value = yesterdayStr();
+  document.getElementById('date-to').value = todayStr();
+
+  async function searchByDate() {
+    const from = document.getElementById('date-from').value;
+    const to = document.getElementById('date-to').value;
+    if (!from || !to) return;
+
+    const btn = document.getElementById('search-btn');
+    btn.disabled = true;
+    btn.textContent = '검색 중...';
+
+    try {
+      const resp = await fetch(`/search?date_from=${from}&date_to=${to}`);
+      const data = await resp.json();
+      articles = data.articles;
+      totalNew = articles.length;
+      document.getElementById('total').textContent = totalNew;
+      document.getElementById('last-check').textContent = `${from} ~ ${to}`;
+      renderSidebar();
+      renderFilters();
+      renderFeed();
+    } catch (e) {
+      alert('검색 실패: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '검색';
+    }
+  }
 
   // 1분마다 상대 시간 갱신
   setInterval(renderFeed, 60000);
