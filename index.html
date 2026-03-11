@@ -463,8 +463,17 @@
       if (msg.type === 'init') {
         keywords = msg.keywords;
         keywords.forEach(k => getColor(k));
+        if (msg.articles && msg.articles.length > 0) {
+          articles = msg.articles;
+          totalNew = articles.length;
+          document.getElementById('total').textContent = totalNew;
+          document.getElementById('last-check').textContent = now();
+        }
         renderSidebar();
         renderFilters();
+        renderFeed();
+        document.getElementById('conn-text').textContent =
+          `실시간 연결됨 · ${msg.poll_interval}초마다 갱신`;
       }
       if (msg.type === 'article') {
         articles.unshift(msg.data);

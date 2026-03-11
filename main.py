@@ -2,23 +2,21 @@ import asyncio
 import json
 import feedparser
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+from email.utils import parsedate_to_datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-import os
 
 app = FastAPI()
 
-# 모니터링할 키워드 목록
 KEYWORDS = ["아이스크림미디어", "개인정보 유출"]
 POLL_INTERVAL = 60  # 초
 
-# 연결된 WebSocket 클라이언트들
 clients: list[WebSocket] = []
-
-# 이미 본 기사 ID 추적 (중복 방지)
 seen_ids: set[str] = set()
+
+# 초기 1일치 기사 캐시 (새 클라이언트 접속 시 전송용)
+cached_articles: list[dict] = []
 
 
 def get_rss_url(keyword: str) -> str:
@@ -26,8 +24,14 @@ def get_rss_url(keyword: str) -> str:
     return f"https://news.google.com/rss/search?q={quote(keyword)}&hl=ko&gl=KR&ceid=KR:ko"
 
 
-async def fetch_news(keyword: str) -> list[dict]:
-    """Google News RSS에서 기사 가져오기"""
+def parse_published(entry) -> datetime:
+    try:
+        return parsedate_to_datetime(entry.get("published", "")).astimezone(timezone.utc)
+    except Exception:
+        return datetime.now(timezone.utc)
+
+
+async def fetch_news(keyword: str, since: datetime | None = None) -> list[dict]:
     url = get_rss_url(keyword)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
@@ -36,6 +40,12 @@ async def fetch_news(keyword: str) -> list[dict]:
             articles = []
             for entry in feed.entries:
                 article_id = entry.get("id", entry.get("link", ""))
+                pub = parse_published(entry)
+
+                # since 기준 필터 (초기 로딩용)
+                if since and pub < since:
+                    continue
+
                 if article_id not in seen_ids:
                     seen_ids.add(article_id)
                     articles.append({
@@ -43,9 +53,9 @@ async def fetch_news(keyword: str) -> list[dict]:
                         "title": entry.get("title", ""),
                         "link": entry.get("link", ""),
                         "source": entry.get("source", {}).get("title", ""),
-                        "published": entry.get("published", ""),
+                        "published": pub.isoformat(),
                         "summary": entry.get("summary", "")[:200],
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": pub.isoformat(),
                     })
             return articles
     except Exception as e:
@@ -54,7 +64,6 @@ async def fetch_news(keyword: str) -> list[dict]:
 
 
 async def broadcast(message: dict):
-    """모든 연결된 클라이언트에 메시지 전송"""
     dead = []
     for ws in clients:
         try:
@@ -66,13 +75,22 @@ async def broadcast(message: dict):
 
 
 async def poll_loop():
-    """백그라운드 폴링 루프"""
-    print("[POLLER] 시작")
-    # 초기 로딩: 각 키워드 최신 기사 5개씩 seen에 등록 (중복 방지)
-    for keyword in KEYWORDS:
-        articles = await fetch_news(keyword)
-        print(f"[INIT] {keyword}: {len(articles)}개 초기화")
+    print("[POLLER] 시작 - 1일치 초기 로딩")
+    since_1d = datetime.now(timezone.utc) - timedelta(days=1)
 
+    # 초기: 1일치 기사 전부 수집
+    for keyword in KEYWORDS:
+        articles = await fetch_news(keyword, since=since_1d)
+        # 최신순 정렬
+        articles.sort(key=lambda a: a["published"], reverse=True)
+        cached_articles.extend(articles)
+        print(f"[INIT] {keyword}: {len(articles)}개 로딩")
+
+    # cached_articles 전체 최신순 정렬
+    cached_articles.sort(key=lambda a: a["published"], reverse=True)
+    print(f"[INIT] 총 {len(cached_articles)}개 캐시 완료")
+
+    # 이후 폴링
     while True:
         await asyncio.sleep(POLL_INTERVAL)
         print(f"[POLL] {datetime.now().strftime('%H:%M:%S')} 체크 중...")
@@ -80,6 +98,7 @@ async def poll_loop():
             new_articles = await fetch_news(keyword)
             for article in new_articles:
                 print(f"[NEW] {keyword}: {article['title'][:50]}")
+                cached_articles.insert(0, article)
                 await broadcast({"type": "article", "data": article})
 
 
@@ -93,15 +112,18 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     clients.append(ws)
     print(f"[WS] 클라이언트 연결 ({len(clients)}명)")
-    # 연결 시 현재 키워드 목록 전송
+
+    # 초기 메시지: 키워드 + 1일치 기사 한 번에 전송
     await ws.send_text(json.dumps({
         "type": "init",
         "keywords": KEYWORDS,
         "poll_interval": POLL_INTERVAL,
+        "articles": cached_articles[:100],  # 최대 100개
     }, ensure_ascii=False))
+
     try:
         while True:
-            await ws.receive_text()  # keep alive
+            await ws.receive_text()
     except WebSocketDisconnect:
         clients.remove(ws)
         print(f"[WS] 클라이언트 해제 ({len(clients)}명)")

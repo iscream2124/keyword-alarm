@@ -1,0 +1,4 @@
+[     281ms] [ERROR] Mixed Content: The page at 'https://keyword-alarm.onrender.com/' was loaded over HTTPS, but attempted to connect to the insecure WebSocket endpoint 'ws://keyword-alarm.onrender.com/ws'. This request has been blocked; this endpoint must be available over WSS. @ https://keyword-alarm.onrender.com/:446
+[     282ms] SecurityError: Failed to construct 'WebSocket': An insecure WebSocket connection may not be initiated from a page loaded over HTTPS.
+    at connect (https://keyword-alarm.onrender.com/:447:10)
+    at https://keyword-alarm.onrender.com/:615:3
