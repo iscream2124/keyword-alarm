@@ -471,6 +471,8 @@
         totalNew++;
         document.getElementById('total').textContent = totalNew;
         document.getElementById('last-check').textContent = now();
+        renderSidebar();
+        renderFilters();
         renderFeed();
         showToast(msg.data);
         beep();
