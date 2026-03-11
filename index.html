@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>키워드 모니터</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d14;
+      --surface: #14141e;
+      --surface2: #1c1c2a;
+      --border: #252535;
+      --border-hover: #35354a;
+      --text: #e8e8f0;
+      --text-muted: #6b6b88;
+      --text-dim: #3a3a52;
+      --accent: #7c6fff;
+      --accent-soft: #1e1a42;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Noto Sans KR', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── 헤더 ── */
+    header {
+      height: 52px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .logo-icon {
+      width: 26px; height: 26px;
+      background: var(--accent);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+    }
+
+    .divider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+    .conn-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--surface2);
+      color: var(--text-muted);
+    }
+
+    .conn-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.3s;
+    }
+    .conn-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: blink 2.5s infinite; }
+    .conn-dot.dead { background: var(--red); }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+    .stat-pill {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 12px;
+    }
+
+    .stat-pill span { color: var(--text); font-weight: 600; }
+
+    /* ── 레이아웃 ── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── 사이드바 ── */
+    aside {
+      width: 200px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      padding: 16px 12px;
+      gap: 6px;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--text-dim);
+      padding: 0 6px;
+      margin-bottom: 2px;
+    }
+
+    .kw-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-muted);
+      transition: background 0.15s, color 0.15s;
+      border: 1px solid transparent;
+    }
+    .kw-item:hover { background: var(--surface2); color: var(--text); }
+    .kw-item.active {
+      background: var(--accent-soft);
+      border-color: rgba(124,111,255,.25);
+      color: #b0a6ff;
+    }
+
+    .kw-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    .kw-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .kw-count {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      min-width: 20px;
+      text-align: right;
+    }
+    .kw-item.active .kw-count { color: #7c6fff; }
+
+    .sidebar-footer {
+      margin-top: auto;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    .add-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .add-row input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 7px 9px;
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .add-row input:focus { border-color: var(--accent); }
+    .add-row input::placeholder { color: var(--text-dim); }
+
+    .add-btn {
+      width: 30px; height: 30px;
+      background: var(--accent);
+      border: none;
+      border-radius: 7px;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .add-btn:hover { background: #6355e8; }
+
+    /* ── 메인 피드 ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .feed-header {
+      height: 44px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .filter-chip {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      background: transparent;
+      transition: all 0.15s;
+    }
+    .filter-chip:hover { border-color: var(--border-hover); color: var(--text); }
+    .filter-chip.active { background: var(--accent-soft); border-color: rgba(124,111,255,.3); color: #b0a6ff; }
+
+    .feed-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .feed-scroll::-webkit-scrollbar { width: 4px; }
+    .feed-scroll::-webkit-scrollbar-track { background: transparent; }
+    .feed-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ── 기사 카드 ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      transition: border-color 0.2s, transform 0.15s;
+      animation: fadeSlide .3s ease;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+    }
+
+    .card:hover {
+      border-color: var(--border-hover);
+      transform: translateX(3px);
+    }
+
+    .card.fresh { border-left: 3px solid var(--accent); }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 7px;
+    }
+
+    .kw-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 5px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .new-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: var(--accent);
+      color: #fff;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.5;
+      word-break: keep-all;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .card-meta .dot { color: var(--text-dim); }
+
+    .card-summary {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      word-break: keep-all;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ── 빈 상태 ── */
+    .empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text-dim);
+    }
+    .empty-icon { font-size: 40px; filter: grayscale(1) opacity(.4); }
+    .empty-title { font-size: 15px; color: var(--text-muted); }
+    .empty-sub { font-size: 13px; }
+
+    /* ── 토스트 ── */
+    #toasts {
+      position: fixed;
+      bottom: 20px; right: 20px;
+      display: flex; flex-direction: column;
+      gap: 8px;
+      z-index: 999;
+    }
+
+    .toast {
+      background: var(--surface2);
+      border: 1px solid rgba(124,111,255,.4);
+      border-radius: 12px;
+      padding: 12px 15px;
+      min-width: 300px;
+      max-width: 380px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      animation: toastIn .3s ease;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(10px) scale(.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .toast-kw { font-size: 11px; color: #9d97ff; margin-bottom: 4px; font-weight: 500; }
+    .toast-title { font-size: 13px; color: var(--text); line-height: 1.4; word-break: keep-all; }
+    .toast-source { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+
+    .toast-bar {
+      height: 2px;
+      border-radius: 2px;
+      background: var(--accent);
+      margin-top: 10px;
+      animation: shrink 4s linear forwards;
+    }
+    @keyframes shrink { from{width:100%} to{width:0} }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    키워드 모니터
+  </div>
+  <div class="divider"></div>
+  <div class="conn-badge">
+    <div class="conn-dot" id="dot"></div>
+    <span id="conn-text">연결 중</span>
+  </div>
+  <div class="header-right">
+    <div class="stat-pill">새 기사 <span id="total">0</span>개</div>
+    <div class="stat-pill">마지막 체크 <span id="last-check">—</span></div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="section-label">키워드</div>
+    <div id="kw-list"></div>
+    <div class="sidebar-footer">
+      <div class="add-row">
+        <input type="text" id="kw-input" placeholder="키워드 추가" />
+        <button class="add-btn" onclick="addKeyword()">+</button>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="feed-header" id="filter-bar"></div>
+    <div class="feed-scroll" id="feed">
+      <div class="empty" id="empty">
+        <div class="empty-icon">📡</div>
+        <div class="empty-title">모니터링 중...</div>
+        <div class="empty-sub">새 기사가 감지되면 여기에 표시됩니다</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+  // 키워드별 색상
+  const COLORS = ['#7c6fff','#22c55e','#f59e0b','#ef4444','#06b6d4','#ec4899','#a78bfa','#34d399'];
+  const kwColor = {};
+
+  let ws, articles = [], keywords = [], activeFilter = 'all', totalNew = 0;
+
+  function getColor(kw) {
+    if (!kwColor[kw]) {
+      const idx = Object.keys(kwColor).length % COLORS.length;
+      kwColor[kw] = COLORS[idx];
+    }
+    return kwColor[kw];
+  }
+
+  function connect() {
+    ws = new WebSocket(`ws://${location.host}/ws`);
+
+    ws.onopen = () => {
+      document.getElementById('dot').className = 'conn-dot live';
+      document.getElementById('conn-text').textContent = '실시간 연결됨';
+    };
+
+    ws.onclose = () => {
+      document.getElementById('dot').className = 'conn-dot dead';
+      document.getElementById('conn-text').textContent = '재연결 중...';
+      setTimeout(connect, 3000);
+    };
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'init') {
+        keywords = msg.keywords;
+        keywords.forEach(k => getColor(k));
+        renderSidebar();
+        renderFilters();
+      }
+      if (msg.type === 'article') {
+        articles.unshift(msg.data);
+        totalNew++;
+        document.getElementById('total').textContent = totalNew;
+        document.getElementById('last-check').textContent = now();
+        renderFeed();
+        showToast(msg.data);
+        beep();
+      }
+    };
+  }
+
+  function renderSidebar() {
+    const counts = {};
+    articles.forEach(a => counts[a.keyword] = (counts[a.keyword] || 0) + 1);
+
+    document.getElementById('kw-list').innerHTML = [
+      `<div class="kw-item ${activeFilter==='all'?'active':''}" onclick="setFilter('all')">
+        <div class="kw-dot" style="background:var(--text-dim)"></div>
+        <span class="kw-name">전체</span>
+        <span class="kw-count">${articles.length}</span>
+      </div>`
+    ].concat(keywords.map(k => `
+      <div class="kw-item ${activeFilter===k?'active':''}" onclick="setFilter('${k}')">
+        <div class="kw-dot" style="background:${getColor(k)}"></div>
+        <span class="kw-name">${k}</span>
+        <span class="kw-count">${counts[k]||0}</span>
+      </div>
+    `)).join('');
+  }
+
+  function renderFilters() {
+    document.getElementById('filter-bar').innerHTML = [
+      `<button class="filter-chip ${activeFilter==='all'?'active':''}" onclick="setFilter('all')">전체</button>`
+    ].concat(keywords.map(k =>
+      `<button class="filter-chip ${activeFilter===k?'active':''}" onclick="setFilter('${k}')">${k}</button>`
+    )).join('');
+  }
+
+  function setFilter(f) {
+    activeFilter = f;
+    renderSidebar();
+    renderFilters();
+    renderFeed();
+  }
+
+  function renderFeed() {
+    const filtered = activeFilter === 'all' ? articles : articles.filter(a => a.keyword === activeFilter);
+    const feed = document.getElementById('feed');
+    const empty = document.getElementById('empty');
+
+    // 기존 카드 제거
+    [...feed.children].forEach(el => { if (el.id !== 'empty') el.remove(); });
+
+    if (filtered.length === 0) {
+      empty.style.display = 'flex';
+      return;
+    }
+    empty.style.display = 'none';
+
+    filtered.slice(0, 60).forEach((a, i) => {
+      const color = getColor(a.keyword);
+      const card = document.createElement('a');
+      card.href = a.link;
+      card.target = '_blank';
+      card.rel = 'noopener';
+      card.className = `card${i === 0 ? ' fresh' : ''}`;
+      card.innerHTML = `
+        <div class="card-top">
+          <span class="kw-tag" style="background:${color}22;color:${color}">${a.keyword}</span>
+          ${i === 0 ? '<span class="new-tag">NEW</span>' : ''}
+          <div class="card-title">${a.title}</div>
+        </div>
+        <div class="card-meta">
+          <span>${a.source || '출처 불명'}</span>
+          <span class="dot">·</span>
+          <span>${relativeTime(a.timestamp)}</span>
+        </div>
+        ${a.summary ? `<div class="card-summary">${stripHtml(a.summary)}</div>` : ''}
+      `;
+      feed.appendChild(card);
+    });
+  }
+
+  function showToast(a) {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.innerHTML = `
+      <div class="toast-kw">🔔 ${a.keyword}</div>
+      <div class="toast-title">${a.title}</div>
+      <div class="toast-source">${a.source || ''}</div>
+      <div class="toast-bar"></div>
+    `;
+    const c = document.getElementById('toasts');
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 4500);
+    // 최대 3개
+    while (c.children.length > 3) c.firstChild.remove();
+  }
+
+  function beep() {
+    try {
+      const ctx = new AudioContext();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 660;
+      g.gain.setValueAtTime(0.08, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      o.start(); o.stop(ctx.currentTime + 0.25);
+    } catch {}
+  }
+
+  function now() {
+    return new Date().toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+
+  function relativeTime(iso) {
+    const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+    if (diff < 60) return `방금 전`;
+    if (diff < 3600) return `${Math.floor(diff/60)}분 전`;
+    return new Date(iso).toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'});
+  }
+
+  function stripHtml(s) {
+    return s.replace(/<[^>]*>/g, '').replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&#39;/g,"'");
+  }
+
+  async function addKeyword() {
+    const input = document.getElementById('kw-input');
+    const kw = input.value.trim();
+    if (!kw || keywords.includes(kw)) return;
+    input.value = '';
+    await fetch(`/keywords/${encodeURIComponent(kw)}`, { method: 'POST' });
+    keywords.push(kw);
+    getColor(kw);
+    renderSidebar();
+    renderFilters();
+  }
+
+  document.getElementById('kw-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addKeyword();
+  });
+
+  // 1분마다 상대 시간 갱신
+  setInterval(renderFeed, 60000);
+
+  connect();
+</script>
+</body>
+</html>
